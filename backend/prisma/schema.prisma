@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ATTENDANT
+  MANAGER
+  GENERAL_MANAGER
+  ADMIN
+}
+
+enum LeadSource {
+  STORE_VISIT
+  PHONE
+  WHATSAPP
+  INSTAGRAM
+  DIGITAL_FORM
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum LeadImportance {
+  COLD
+  WARM
+  HOT
+}
+
+enum NegotiationStage {
+  FIRST_CONTACT
+  QUALIFICATION
+  PROPOSAL
+  DOCUMENTATION
+  CLOSING
+}
+
+enum NegotiationStatus {
+  OPEN
+  WON
+  LOST
+  CANCELED
+}
+
+enum LogAction {
+  LOGIN
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model Team {
+  id         String   @id @default(cuid())
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  managerId  String?  @unique
+  manager    User?    @relation("ManagedTeam", fields: [managerId], references: [id])
+  attendants User[]   @relation("TeamMembers")
+  leads      Lead[]
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  city      String
+  state     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  leads     Lead[]
+}
+
+model User {
+  id              String         @id @default(cuid())
+  name            String
+  email           String         @unique
+  passwordHash    String
+  role            UserRole
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  teamId          String?
+  team            Team?          @relation("TeamMembers", fields: [teamId], references: [id])
+  managedTeam     Team?          @relation("ManagedTeam")
+  assignedLeads   Lead[]         @relation("LeadOwner")
+  operationLogs   OperationLog[]
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String
+  cpf       String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  leads     Lead[]
+}
+
+model Lead {
+  id                 String                    @id @default(cuid())
+  title              String
+  description        String?
+  source             LeadSource
+  status             LeadStatus                @default(NEW)
+  importance         LeadImportance            @default(WARM)
+  firstContactAt     DateTime?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  customerId         String
+  customer           Customer                  @relation(fields: [customerId], references: [id])
+  storeId            String
+  store              Store                     @relation(fields: [storeId], references: [id])
+  attendantId        String
+  attendant          User                      @relation("LeadOwner", fields: [attendantId], references: [id])
+  teamId             String?
+  team               Team?                     @relation(fields: [teamId], references: [id])
+  negotiations       Negotiation[]
+  statusHistory      NegotiationStatusHistory[]
+  stageHistory       NegotiationStageHistory[]
+
+  @@index([attendantId, createdAt])
+  @@index([teamId, createdAt])
+  @@index([storeId, createdAt])
+  @@index([status, createdAt])
+}
+
+model Negotiation {
+  id               String            @id @default(cuid())
+  leadId           String
+  lead             Lead              @relation(fields: [leadId], references: [id])
+  isActive         Boolean           @default(true)
+  stage            NegotiationStage  @default(FIRST_CONTACT)
+  status           NegotiationStatus @default(OPEN)
+  closingReason    String?
+  openedAt         DateTime          @default(now())
+  closedAt         DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([leadId, isActive])
+}
+
+model NegotiationStatusHistory {
+  id            String            @id @default(cuid())
+  leadId        String
+  lead          Lead              @relation(fields: [leadId], references: [id])
+  fromStatus    NegotiationStatus?
+  toStatus      NegotiationStatus
+  changedAt     DateTime          @default(now())
+}
+
+model NegotiationStageHistory {
+  id            String           @id @default(cuid())
+  leadId        String
+  lead          Lead             @relation(fields: [leadId], references: [id])
+  fromStage     NegotiationStage?
+  toStage       NegotiationStage
+  changedAt     DateTime         @default(now())
+}
+
+model OperationLog {
+  id          String    @id @default(cuid())
+  action      LogAction
+  entity      String
+  entityId    String?
+  description String?
+  createdAt   DateTime  @default(now())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([entity, createdAt])
+}

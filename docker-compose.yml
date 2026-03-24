@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: crm-abp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: crm_abp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: crm-abp-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file:
+      - ./backend/.env
+    ports:
+      - '3000:3000'
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: crm-abp-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '4173:4173'
+
+volumes:
+  postgres_data:
