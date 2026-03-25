@@ -9,6 +9,8 @@ import { LeadsModule } from './leads/leads.module';
 import { NegotiationsModule } from './negotiations/negotiations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StoresModule } from './stores/stores.module';
+import { PermissionsModule } from './permissions/permissions.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { StoresModule } from './stores/stores.module';
     LeadsModule,
     NegotiationsModule,
     StoresModule,
+    PermissionsModule,
+    UsersModule,
   ],
 })
 export class AppModule {}

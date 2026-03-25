@@ -95,6 +95,30 @@ async function main() {
     teamId: premiumTeam.id,
   });
 
+  // Seed default permissions and assign to admin (owner)
+  const defaultPermissions = [
+    { key: 'leads.create', resource: 'leads', action: 'create', description: 'Create leads' },
+    { key: 'leads.update', resource: 'leads', action: 'update', description: 'Update leads' },
+    { key: 'customers.create', resource: 'customers', action: 'create', description: 'Create customers' },
+    { key: 'customers.update', resource: 'customers', action: 'update', description: 'Update customers' },
+    { key: 'negotiations.manage', resource: 'negotiations', action: 'manage', description: 'Manage negotiations' },
+    { key: 'permissions.manage', resource: 'permissions', action: 'manage', description: 'Manage permissions' },
+  ];
+
+  for (const p of defaultPermissions) {
+    const perm = await prisma.permission.upsert({
+      where: { key: p.key },
+      update: { description: p.description },
+      create: p,
+    });
+
+    await prisma.userPermission.upsert({
+      where: { userId_permissionId: { userId: admin.id, permissionId: perm.id } },
+      update: {},
+      create: { userId: admin.id, permissionId: perm.id },
+    });
+  }
+
   const generalManager = await upsertUser({
     name: 'Leonardo Robles',
     email: 'geral@crm.local',

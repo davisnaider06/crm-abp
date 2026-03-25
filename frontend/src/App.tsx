@@ -32,6 +32,7 @@ import {
   YAxis,
 } from 'recharts';
 import ApiClient from './services/api';
+import PermissionsPage from './components/Permissions';
 
 type LoginCard = {
   id: string;
@@ -141,6 +142,7 @@ const menuPrimary = [
   { label: 'Leads', icon: Bell, to: '/leads' },
   { label: 'Customers', icon: Users, to: '/customers' },
   { label: 'Deals', icon: Handshake, to: '/negotiations' },
+  { label: 'Permissions', icon: Users, to: '/permissions' },
 ];
 
 const menuSecondary = [
@@ -253,6 +255,7 @@ function App() {
         <Route path="/leads" element={<ProtectedRoute><LeadsPage /></ProtectedRoute>} />
         <Route path="/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
         <Route path="/negotiations" element={<ProtectedRoute><NegotiationsPage /></ProtectedRoute>} />
+        <Route path="/permissions" element={<ProtectedRoute><PermissionsPage /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );
@@ -412,7 +415,27 @@ function DashboardShell({ title, children }: { title: string; children: ReactNod
                 <ChevronLeft size={16} />
               </button>
             </div>
-            <div className="menu-group"><p>Tools</p>{menuPrimary.map(({ label, icon: Icon, to }) => <NavLink key={label} to={to} className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}><Icon size={16} /><span>{label}</span></NavLink>)}</div>
+            <div className="menu-group"><p>Tools</p>{
+              (() => {
+                const tok = api.getToken();
+                let role = null as string | null;
+                try {
+                  if (tok) {
+                    const parts = tok.split('.');
+                    if (parts.length >= 2) {
+                      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+                      role = payload.role ?? null;
+                    }
+                  }
+                } catch {}
+
+                return menuPrimary
+                  .filter((item) => item.label !== 'Permissions' || role === 'ADMIN')
+                  .map(({ label, icon: Icon, to }) => (
+                    <NavLink key={label} to={to} className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}><Icon size={16} /><span>{label}</span></NavLink>
+                  ));
+              })()
+            }</div>
             <div className="menu-group"><p>Other</p>{menuSecondary.map(({ label, icon: Icon, to }) => <NavLink key={label} to={to} className="menu-item"><Icon size={16} /><span>{label}</span></NavLink>)}</div>
           </div>
           <div className="profile-card"><div className="profile-avatar">M</div><div><strong>Mr. Afflek</strong><span>Head of HR</span></div></div>

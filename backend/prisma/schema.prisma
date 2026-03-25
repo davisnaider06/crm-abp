@@ -94,6 +94,7 @@ model User {
   managedTeam     Team?          @relation("ManagedTeam")
   assignedLeads   Lead[]         @relation("LeadOwner")
   operationLogs   OperationLog[]
+  userPermissions UserPermission[]
 }
 
 model Customer {
@@ -167,6 +168,29 @@ model NegotiationStageHistory {
   fromStage     NegotiationStage?
   toStage       NegotiationStage
   changedAt     DateTime         @default(now())
+}
+
+model Permission {
+  id           String            @id @default(cuid())
+  key          String            @unique
+  resource     String
+  action       String
+  description  String?
+  createdAt    DateTime          @default(now())
+  userLinks    UserPermission[]
+}
+
+model UserPermission {
+  id           String      @id @default(cuid())
+  userId       String
+  permissionId String
+  createdAt    DateTime    @default(now())
+
+  user         User        @relation(fields: [userId], references: [id])
+  permission   Permission  @relation(fields: [permissionId], references: [id])
+
+  @@unique([userId, permissionId])
+  @@index([userId, createdAt])
 }
 
 model OperationLog {

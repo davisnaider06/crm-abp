@@ -10,7 +10,14 @@ async function bootstrap() {
   const prismaService = app.get(PrismaService);
 
   app.enableCors({
-    origin: configService.getOrThrow<string>('FRONTEND_URL'),
+    origin: (origin, callback) => {
+      const frontendUrl = configService.get<string>('FRONTEND_URL');
+      const allowed = [frontendUrl, 'http://localhost:5173', 'http://localhost:5174'].filter(Boolean);
+      // allow non-browser requests (e.g. curl, server-to-server)
+      if (!origin) return callback(null, true);
+      if (allowed.includes(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   });
   app.setGlobalPrefix('api');

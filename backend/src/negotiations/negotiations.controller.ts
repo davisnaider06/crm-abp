@@ -4,12 +4,14 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { Permission } from '../permissions/permission.decorator';
+import { PermissionsGuard } from '../permissions/permissions.guard';
 import { CreateNegotiationDto } from './dto/create-negotiation.dto';
 import { NegotiationsService } from './negotiations.service';
 import { UpdateNegotiationDto } from './dto/update-negotiation.dto';
 
 @Controller('negotiations')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class NegotiationsController {
   constructor(private readonly negotiationsService: NegotiationsService) {}
 
@@ -26,12 +28,14 @@ export class NegotiationsController {
 
   @Post()
   @Roles(UserRole.ATTENDANT, UserRole.MANAGER, UserRole.ADMIN)
+  @Permission('negotiations.manage')
   create(@Body() createNegotiationDto: CreateNegotiationDto) {
     return this.negotiationsService.create(createNegotiationDto);
   }
 
   @Patch(':id')
   @Roles(UserRole.ATTENDANT, UserRole.MANAGER, UserRole.ADMIN)
+  @Permission('negotiations.manage')
   update(
     @Param('id') id: string,
     @Body() updateNegotiationDto: UpdateNegotiationDto,

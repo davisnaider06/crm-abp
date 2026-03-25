@@ -1,4 +1,4 @@
-const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000/api';
+const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:4000/api';
 
 export default class ApiClient {
   private static instance: ApiClient | null = null;
