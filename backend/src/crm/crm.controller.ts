@@ -1,4 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
+import type { User } from '@prisma/client';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CrmService } from './crm.service';
 
@@ -8,22 +10,22 @@ export class CrmController {
   constructor(private readonly crmService: CrmService) {}
 
   @Get('dashboard')
-  getDashboard() {
-    return this.crmService.getDashboard();
+  getDashboard(@CurrentUser() user: User) {
+    return this.crmService.getDashboard(user);
   }
 
   @Get('leads')
-  getLeads() {
-    return this.crmService.getLeads();
+  getLeads(@CurrentUser() user: User) {
+    return this.crmService.getLeads(user);
   }
 
   @Get('customers')
-  getCustomers() {
-    return this.crmService.getCustomers();
+  getCustomers(@CurrentUser() user: User) {
+    return this.crmService.getCustomers(user);
   }
 
   @Get('negotiations')
-  getNegotiations() {
-    return this.crmService.getNegotiations();
+  getNegotiations(@CurrentUser() user: User) {
+    return this.crmService.getNegotiations(user);
   }
 }

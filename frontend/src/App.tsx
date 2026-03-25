@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import {
+  ChevronLeft,
+  ChevronRight,
   Bell,
   CalendarDays,
-  ChevronRight,
   CirclePlus,
   FileText,
   Filter,
@@ -163,6 +164,99 @@ function clearAuthToken() {
   window.localStorage.removeItem(authStorageKey);
 }
 
+type StoreRecord = {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+};
+
+type CustomerRecord = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone: string;
+  cpf?: string | null;
+  updatedAt?: string;
+  leads?: Array<{
+    title: string;
+    store?: { city: string };
+  }>;
+};
+
+type LeadRecord = {
+  id: string;
+  title: string;
+  source: string;
+  status: string;
+  importance: string;
+  description?: string | null;
+  customer: { id: string; name: string };
+  store: { id: string; city: string };
+  attendant: { id: string; name: string };
+};
+
+type NegotiationRecord = {
+  id: string;
+  stage: string;
+  status: string;
+  lead: {
+    id: string;
+    title: string;
+    customer: { name: string };
+  };
+};
+
+async function apiRequest<T>(path: string, init?: RequestInit) {
+  const token = getAuthToken();
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+function useApiResource<T>(path: string, fallback: T) {
+  const [data, setData] = useState<T>(fallback);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function load() {
+      try {
+        const payload = await apiRequest<T>(path, { method: 'GET' });
+        if (!ignore) {
+          setData(payload);
+        }
+      } catch {
+        // Keep fallback when API is offline or unauthorized.
+      }
+    }
+
+    void load();
+
+    return () => {
+      ignore = true;
+    };
+  }, [path, refreshKey]);
+
+  return {
+    data,
+    refresh: () => setRefreshKey((current) => current + 1),
+    setData,
+  };
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -197,13 +291,7 @@ function LoginPage() {
 
   return (
     <div className="login-shell">
-      <motion.div className="login-browser" initial={{ opacity: 0, y: 28, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.65, ease: 'easeOut' }}>
-        <div className="browser-topbar">
-          <div className="browser-dots"><span className="dot red" /><span className="dot yellow" /><span className="dot green" /></div>
-          <div className="browser-nav"><span className="browser-arrow">{'<'}</span><span className="browser-arrow">{'>'}</span></div>
-          <div className="browser-tab">fundex.revolution</div>
-          <div className="browser-actions"><span /><span /><span /></div>
-        </div>
+      <motion.div className="login-browser login-browser-flat" initial={{ opacity: 0, y: 28, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.65, ease: 'easeOut' }}>
         <div className="login-stage">
           <section className="login-visual">
             <div className="login-pattern" />
@@ -284,7 +372,7 @@ function LeadsPage() { return <DashboardShell title="Leads"><LeadsContent /></Da
 function CustomersPage() { return <DashboardShell title="Customers"><CustomersContent /></DashboardShell>; }
 function NegotiationsPage() { return <DashboardShell title="Deals"><NegotiationsContent /></DashboardShell>; }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: { children: ReactNode }) {
   if (!getAuthToken()) {
     return <Navigate to="/login" replace />;
   }
@@ -300,20 +388,7 @@ function useRemoteData<T>(path: string, fallback: T) {
 
     async function load() {
       try {
-        const token = getAuthToken();
-        const response = await fetch(`${apiBaseUrl}${path}`, {
-          headers: token
-            ? {
-                Authorization: `Bearer ${token}`,
-              }
-            : undefined,
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = (await response.json()) as T;
+        const payload = await apiRequest<T>(path, { method: 'GET' });
         if (!ignore) {
           setData(payload);
         }
@@ -332,22 +407,36 @@ function useRemoteData<T>(path: string, fallback: T) {
   return data;
 }
 
-function DashboardShell({ title, children }: { title: string; children: React.ReactNode }) {
+function DashboardShell({ title, children }: { title: string; children: ReactNode }) {
   const navigate = useNavigate();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="app-shell">
       <div className="ambient ambient-left" />
       <div className="ambient ambient-right" />
-      <aside className="design-rail">
-        <section><p className="rail-title">Tools</p><div className="tool-list"><div className="figma-mark"><span className="figma-dot figma-red" /><span className="figma-dot figma-blue" /><span className="figma-dot figma-purple" /><span className="figma-dot figma-green" /></div><span className="rail-caption">Figma</span></div></section>
-        <section><p className="rail-title">Colors</p><div className="palette">{['#6F3FF5', '#FFAE43', '#FFE256'].map((color) => <div key={color} className="palette-pill" style={{ backgroundColor: color }}><span>{color}</span></div>)}</div></section>
-        <section><p className="rail-title">Typography</p><div className="type-sample"><strong>TT Norms</strong><span>Aa Bb Cc Dd Ee Ff ..</span><span>123456789</span></div></section>
-      </aside>
-      <motion.main className="dashboard-frame" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: 'easeOut' }}>
-        <aside className="sidebar">
+      {!isSidebarOpen ? (
+        <button
+          className="sidebar-fab"
+          onClick={() => setIsSidebarOpen(true)}
+          aria-label="Open sidebar"
+        >
+          <ChevronRight size={18} />
+        </button>
+      ) : null}
+      <motion.main className={`dashboard-frame ${isSidebarOpen ? 'sidebar-open' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: 'easeOut' }}>
+        <aside className={`sidebar ${isSidebarOpen ? 'open' : 'hidden'}`}>
           <div>
-            <div className="brand"><h1>HR</h1><span>Automation Tool</span></div>
+            <div className="brand-row">
+              <div className="brand"><h1>HR</h1><span>Automation Tool</span></div>
+              <button
+                className="sidebar-toggle"
+                onClick={() => setIsSidebarOpen(false)}
+                aria-label="Close sidebar"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            </div>
             <div className="menu-group"><p>Tools</p>{menuPrimary.map(({ label, icon: Icon, to }) => <NavLink key={label} to={to} className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}><Icon size={16} /><span>{label}</span></NavLink>)}</div>
             <div className="menu-group"><p>Other</p>{menuSecondary.map(({ label, icon: Icon, to }) => <NavLink key={label} to={to} className="menu-item"><Icon size={16} /><span>{label}</span></NavLink>)}</div>
           </div>
@@ -358,7 +447,6 @@ function DashboardShell({ title, children }: { title: string; children: React.Re
             <h2>{title}</h2>
             <div className="topbar-actions">
               <label className="searchbox"><Search size={16} /><input placeholder="Search" /></label>
-              {title !== 'Dashboard' ? <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="primary-action"><CirclePlus size={16} /><span>New item</span></motion.button> : null}
               <button
                 className="ghost-filter"
                 onClick={() => {
@@ -405,7 +493,7 @@ function DashboardOverview() {
 }
 
 function LeadsContent() {
-  const leadsData = useRemoteData('/crm/leads', {
+  const analytics = useRemoteData('/crm/leads', {
     overview: {
       active: 189,
       responseRate: '62%',
@@ -414,17 +502,140 @@ function LeadsContent() {
     chart: leadsByMonth,
     rows: leadRows,
   });
+  const { data: leads, refresh: refreshLeads } = useApiResource<LeadRecord[]>('/leads', []);
+  const { data: customers } = useApiResource<CustomerRecord[]>('/customers', []);
+  const { data: stores } = useApiResource<StoreRecord[]>('/stores', []);
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    source: 'WHATSAPP',
+    importance: 'WARM',
+    customerId: '',
+    storeId: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  function openCreate() {
+    setEditingId(null);
+    setForm({ title: '', description: '', source: 'WHATSAPP', importance: 'WARM', customerId: '', storeId: '' });
+    setIsOpen(true);
+    setErrorMsg('');
+  }
+
+  function openEdit(row: LeadRecord) {
+    setEditingId(row.id);
+    setForm({
+      title: row.title,
+      description: row.description ?? '',
+      source: row.source ?? 'WHATSAPP',
+      importance: row.importance ?? 'WARM',
+      customerId: row.customer.id,
+      storeId: row.store.id,
+    });
+    setIsOpen(true);
+    setErrorMsg('');
+  }
+
+  async function submitLead(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMsg('');
+
+    if (!form.title.trim() || !form.customerId || !form.storeId) {
+      setErrorMsg('Please fill required fields: title, customer and store.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (editingId) {
+        await apiRequest(`/leads/${editingId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(form),
+        });
+      } else {
+        await apiRequest('/leads', {
+          method: 'POST',
+          body: JSON.stringify(form),
+        });
+      }
+
+      setForm({ title: '', description: '', source: 'WHATSAPP', importance: 'WARM', customerId: '', storeId: '' });
+      setIsOpen(false);
+      setEditingId(null);
+      refreshLeads();
+    } catch (err) {
+      setErrorMsg((err as Error).message ?? 'Unable to save lead');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <section className="entity-grid">
-      <article className="panel soft-panel"><div className="panel-head"><div><h3>Pipeline overview</h3><span>Last 30 days</span></div><button className="ghost-filter"><Filter size={16} /><span>Filters</span></button></div><div className="mini-stats"><div><strong>{leadsData.overview.active}</strong><span>Active leads</span></div><div><strong>{leadsData.overview.responseRate}</strong><span>Response rate</span></div><div><strong>{leadsData.overview.firstReply}</strong><span>Avg. first reply</span></div></div><div className="chart-wrap chart-tall"><ResponsiveContainer width="100%" height="100%"><LineChart data={leadsData.chart}><CartesianGrid vertical={false} stroke="#f3eefc" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#a29bb7', fontSize: 12 }} /><YAxis hide /><Tooltip /><Line type="monotone" dataKey="value" stroke="#6f3ff5" strokeWidth={3} dot={false} /></LineChart></ResponsiveContainer></div></article>
-      <article className="panel table-panel"><div className="panel-head"><h3>Recent leads</h3><button>View all</button></div><div className="entity-table"><div className="entity-head"><span>Lead</span><span>Origin</span><span>Store</span><span>Status</span><span>Owner</span></div>{leadsData.rows.map((row) => <div key={row.name} className="entity-row"><span>{row.name}</span><span>{row.origin}</span><span>{row.store}</span><span><Badge tone={row.tone}>{row.status}</Badge></span><span>{row.owner}</span></div>)}</div></article>
+      <article className="panel soft-panel">
+        <div className="panel-head">
+          <div><h3>Pipeline overview</h3><span>Last 30 days</span></div>
+          <div className="inline-actions">
+            <button className="ghost-filter"><Filter size={16} /><span>Filters</span></button>
+            <button className="primary-action" onClick={openCreate}><CirclePlus size={16} /><span>{isOpen && !editingId ? 'Close form' : 'New lead'}</span></button>
+          </div>
+        </div>
+        {isOpen ? (
+          <form className="crud-form" onSubmit={submitLead}>
+            <input placeholder="Vehicle / lead title" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
+            <select value={form.customerId} onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}>
+              <option value="">Select customer</option>
+              {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+            </select>
+            <select value={form.storeId} onChange={(event) => setForm((current) => ({ ...current, storeId: event.target.value }))}>
+              <option value="">Select store</option>
+              {stores.map((store) => <option key={store.id} value={store.id}>{store.city}</option>)}
+            </select>
+            <select value={form.source} onChange={(event) => setForm((current) => ({ ...current, source: event.target.value }))}>
+              <option value="WHATSAPP">WhatsApp</option>
+              <option value="INSTAGRAM">Instagram</option>
+              <option value="STORE_VISIT">Store visit</option>
+              <option value="PHONE">Phone</option>
+              <option value="DIGITAL_FORM">Digital form</option>
+            </select>
+            <select value={form.importance} onChange={(event) => setForm((current) => ({ ...current, importance: event.target.value }))}>
+              <option value="HOT">Hot</option>
+              <option value="WARM">Warm</option>
+              <option value="COLD">Cold</option>
+            </select>
+            <input placeholder="Short description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+            {errorMsg ? <div className="form-error">{errorMsg}</div> : null}
+            <button className="primary-action" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : editingId ? 'Save changes' : 'Create lead'}</button>
+          </form>
+        ) : null}
+        <div className="mini-stats"><div><strong>{analytics.overview.active}</strong><span>Active leads</span></div><div><strong>{analytics.overview.responseRate}</strong><span>Response rate</span></div><div><strong>{analytics.overview.firstReply}</strong><span>Avg. first reply</span></div></div><div className="chart-wrap chart-tall"><ResponsiveContainer width="100%" height="100%"><LineChart data={analytics.chart}><CartesianGrid vertical={false} stroke="#f3eefc" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#a29bb7', fontSize: 12 }} /><YAxis hide /><Tooltip /><Line type="monotone" dataKey="value" stroke="#6f3ff5" strokeWidth={3} dot={false} /></LineChart></ResponsiveContainer></div>
+      </article>
+      <article className="panel table-panel">
+        <div className="panel-head"><h3>Lead list</h3><button onClick={refreshLeads}>Refresh</button></div>
+        <div className="entity-table">
+          <div className="entity-head"><span>Lead</span><span>Origin</span><span>Store</span><span>Status</span><span>Owner</span><span /></div>
+          {leads.map((row) => (
+            <div key={row.id} className="entity-row">
+              <span>{row.customer.name}</span>
+              <span>{row.source.replaceAll('_', ' ')}</span>
+              <span>{row.store.city}</span>
+              <span><Badge tone={row.importance === 'HOT' ? 'violet' : row.importance === 'WARM' ? 'gold' : 'slate'}>{row.status.replaceAll('_', ' ')}</Badge></span>
+              <span>{row.attendant.name}</span>
+              <span><button className="ghost-filter" onClick={() => openEdit(row)}>Edit</button></span>
+            </div>
+          ))}
+        </div>
+      </article>
     </section>
   );
 }
 
 function CustomersContent() {
-  const customersData = useRemoteData('/crm/customers', {
+  const analytics = useRemoteData('/crm/customers', {
     segments: [
       { value: 74, label: 'VIP customers', tone: 'default' },
       { value: 46, label: 'Returning buyers', tone: 'warm' },
@@ -432,26 +643,168 @@ function CustomersContent() {
     ],
     rows: customerRows,
   });
+  const { data: customers, refresh: refreshCustomers } = useApiResource<CustomerRecord[]>('/customers', []);
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', email: '', phone: '', cpf: '' });
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+  const [customerError, setCustomerError] = useState('');
+
+  function openCreateCustomer() {
+    setEditingId(null);
+    setForm({ name: '', email: '', phone: '', cpf: '' });
+    setIsOpen(true);
+    setCustomerError('');
+  }
+
+  function openEditCustomer(row: CustomerRecord) {
+    setEditingId(row.id);
+    setForm({ name: row.name, email: row.email ?? '', phone: row.phone, cpf: row.cpf ?? '' });
+    setIsOpen(true);
+    setCustomerError('');
+  }
+
+  async function submitCustomer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCustomerError('');
+
+    if (!form.name.trim() || !form.phone.trim()) {
+      setCustomerError('Please provide at least name and phone.');
+      return;
+    }
+
+    setIsSubmittingCustomer(true);
+    try {
+      if (editingId) {
+        await apiRequest(`/customers/${editingId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(form),
+        });
+      } else {
+        await apiRequest('/customers', {
+          method: 'POST',
+          body: JSON.stringify(form),
+        });
+      }
+
+      setForm({ name: '', email: '', phone: '', cpf: '' });
+      setIsOpen(false);
+      setEditingId(null);
+      refreshCustomers();
+    } catch (err) {
+      setCustomerError((err as Error).message ?? 'Unable to save customer');
+    } finally {
+      setIsSubmittingCustomer(false);
+    }
+  }
 
   return (
     <section className="entity-grid customers-grid">
-      <article className="panel table-panel"><div className="panel-head"><h3>Top relationships</h3><button>Export</button></div><div className="entity-table"><div className="entity-head entity-head-customers"><span>Name</span><span>City</span><span>Stage</span><span>Last vehicle</span><span>Last contact</span></div>{customersData.rows.map((row, index) => <div key={row.name} className="entity-row entity-row-customers"><span className="customer-cell"><span className={`avatar avatar-${(index % 3) + 1}`}>{row.name.charAt(0)}</span><span>{row.name}</span></span><span>{row.city}</span><span><Badge tone="violet">{row.stage}</Badge></span><span>{row.lastDeal}</span><span>{row.contact}</span></div>)}</div></article>
-      <article className="panel side-metrics"><div className="panel-head"><h3>Segments</h3><MoreHorizontal size={18} /></div>{customersData.segments.map((segment) => <div key={segment.label} className={`segment-card ${segment.tone === 'default' ? '' : segment.tone}`}><strong>{segment.value}</strong><span>{segment.label}</span></div>)}</article>
+      <article className="panel table-panel">
+        <div className="panel-head">
+          <h3>Top relationships</h3>
+            <div className="inline-actions">
+            <button onClick={refreshCustomers}>Refresh</button>
+            <button className="primary-action" onClick={openCreateCustomer}><CirclePlus size={16} /><span>{isOpen && !editingId ? 'Close form' : 'New customer'}</span></button>
+          </div>
+        </div>
+        {isOpen ? (
+          <form className="crud-form" onSubmit={submitCustomer}>
+            <input placeholder="Customer name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+            <input placeholder="Email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
+            <input placeholder="Phone" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />
+            <input placeholder="CPF" value={form.cpf} onChange={(event) => setForm((current) => ({ ...current, cpf: event.target.value }))} />
+            {customerError ? <div className="form-error">{customerError}</div> : null}
+            <button className="primary-action" type="submit" disabled={isSubmittingCustomer}>{isSubmittingCustomer ? 'Saving...' : editingId ? 'Save changes' : 'Create customer'}</button>
+          </form>
+        ) : null}
+        <div className="entity-table">
+          <div className="entity-head entity-head-customers"><span>Name</span><span>City</span><span>Stage</span><span>Last vehicle</span><span>Last contact</span><span /></div>
+          {customers.map((row, index) => (
+            <div key={row.id} className="entity-row entity-row-customers">
+              <span className="customer-cell"><span className={`avatar avatar-${(index % 3) + 1}`}>{row.name.charAt(0)}</span><span>{row.name}</span></span>
+              <span>{row.leads?.[0]?.store?.city ?? 'No store'}</span>
+              <span><Badge tone="violet">{row.leads && row.leads.length >= 2 ? 'VIP' : 'Customer'}</Badge></span>
+              <span>{row.leads?.[0]?.title ?? 'No lead yet'}</span>
+              <span>{row.updatedAt ? new Date(row.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}</span>
+              <span><button className="ghost-filter" onClick={() => openEditCustomer(row)}>Edit</button></span>
+            </div>
+          ))}
+        </div>
+      </article>
+      <article className="panel side-metrics"><div className="panel-head"><h3>Segments</h3><MoreHorizontal size={18} /></div>{analytics.segments.map((segment) => <div key={segment.label} className={`segment-card ${segment.tone === 'default' ? '' : segment.tone}`}><strong>{segment.value}</strong><span>{segment.label}</span></div>)}</article>
     </section>
   );
 }
 
 function NegotiationsContent() {
-  const negotiationsData = useRemoteData('/crm/negotiations', {
+  const analytics = useRemoteData('/crm/negotiations', {
     chart: turnoverData,
     pipelineValue: 'R$ 602k',
     rows: dealRows,
   });
+  const { data: negotiations, refresh: refreshNegotiations } = useApiResource<NegotiationRecord[]>('/negotiations', []);
+  const { data: leads } = useApiResource<LeadRecord[]>('/leads', []);
+  const [isOpen, setIsOpen] = useState(false);
+  const [form, setForm] = useState({
+    leadId: '',
+    stage: 'FIRST_CONTACT',
+    status: 'OPEN',
+    closingReason: '',
+  });
+
+  async function submitNegotiation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await apiRequest('/negotiations', {
+      method: 'POST',
+      body: JSON.stringify(form),
+    });
+    setForm({
+      leadId: '',
+      stage: 'FIRST_CONTACT',
+      status: 'OPEN',
+      closingReason: '',
+    });
+    setIsOpen(false);
+    refreshNegotiations();
+  }
 
   return (
     <section className="entity-grid deals-grid">
-      <article className="panel table-panel"><div className="panel-head"><div><h3>Negotiation board</h3><span>Current active deals</span></div><button>Board view</button></div><div className="deal-stack">{negotiationsData.rows.map((row) => <motion.div key={row.lead} className="deal-card" whileHover={{ y: -3 }}><div className="deal-top"><div><strong>{row.lead}</strong><span>{row.vehicle}</span></div><Badge tone={row.probability > 80 ? 'violet' : row.probability > 60 ? 'gold' : 'slate'}>{row.stage}</Badge></div><div className="deal-bottom"><span>{row.amount}</span><div className="probability-track"><div className="probability-fill" style={{ width: `${row.probability}%` }} /></div><small>{row.probability}% close probability</small></div></motion.div>)}</div></article>
-      <article className="panel side-metrics"><div className="panel-head"><h3>Closing status</h3><MoreHorizontal size={18} /></div><div className="chart-wrap chart-tall-small"><ResponsiveContainer width="100%" height="100%"><BarChart data={negotiationsData.chart}><CartesianGrid vertical={false} stroke="#f1edf9" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#a29bb7', fontSize: 12 }} /><YAxis hide /><Tooltip /><Bar dataKey="value" radius={[12, 12, 12, 12]}>{negotiationsData.chart.map((entry, index) => <Cell key={entry.label} fill={index % 2 === 0 ? '#6f3ff5' : '#ffe256'} />)}</Bar></BarChart></ResponsiveContainer></div><div className="segment-card"><strong>{negotiationsData.pipelineValue}</strong><span>Pipeline value</span></div></article>
+      <article className="panel table-panel">
+        <div className="panel-head">
+          <div><h3>Negotiation board</h3><span>Current active deals</span></div>
+          <div className="inline-actions">
+            <button onClick={refreshNegotiations}>Refresh</button>
+            <button className="primary-action" onClick={() => setIsOpen((current) => !current)}><CirclePlus size={16} /><span>{isOpen ? 'Close form' : 'New deal'}</span></button>
+          </div>
+        </div>
+        {isOpen ? (
+          <form className="crud-form" onSubmit={submitNegotiation}>
+            <select value={form.leadId} onChange={(event) => setForm((current) => ({ ...current, leadId: event.target.value }))}>
+              <option value="">Select lead</option>
+              {leads.map((lead) => <option key={lead.id} value={lead.id}>{lead.customer.name} - {lead.title}</option>)}
+            </select>
+            <select value={form.stage} onChange={(event) => setForm((current) => ({ ...current, stage: event.target.value }))}>
+              <option value="FIRST_CONTACT">First contact</option>
+              <option value="QUALIFICATION">Qualification</option>
+              <option value="PROPOSAL">Proposal</option>
+              <option value="DOCUMENTATION">Documentation</option>
+              <option value="CLOSING">Closing</option>
+            </select>
+            <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
+              <option value="OPEN">Open</option>
+              <option value="WON">Won</option>
+              <option value="LOST">Lost</option>
+              <option value="CANCELED">Canceled</option>
+            </select>
+            <input placeholder="Closing reason" value={form.closingReason} onChange={(event) => setForm((current) => ({ ...current, closingReason: event.target.value }))} />
+            <button className="primary-action" type="submit">Create negotiation</button>
+          </form>
+        ) : null}
+        <div className="deal-stack">{negotiations.map((row) => <motion.div key={row.id} className="deal-card" whileHover={{ y: -3 }}><div className="deal-top"><div><strong>{row.lead.customer.name}</strong><span>{row.lead.title}</span></div><Badge tone={row.status === 'WON' ? 'violet' : row.status === 'OPEN' ? 'gold' : 'slate'}>{row.stage.replaceAll('_', ' ')}</Badge></div><div className="deal-bottom"><span>{row.status.replaceAll('_', ' ')}</span><div className="probability-track"><div className="probability-fill" style={{ width: `${row.status === 'WON' ? 100 : row.status === 'OPEN' ? 70 : 40}%` }} /></div><small>{row.status === 'WON' ? 100 : row.status === 'OPEN' ? 70 : 40}% close probability</small></div></motion.div>)}</div>
+      </article>
+      <article className="panel side-metrics"><div className="panel-head"><h3>Closing status</h3><MoreHorizontal size={18} /></div><div className="chart-wrap chart-tall-small"><ResponsiveContainer width="100%" height="100%"><BarChart data={analytics.chart}><CartesianGrid vertical={false} stroke="#f1edf9" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#a29bb7', fontSize: 12 }} /><YAxis hide /><Tooltip /><Bar dataKey="value" radius={[12, 12, 12, 12]}>{analytics.chart.map((entry, index) => <Cell key={entry.label} fill={index % 2 === 0 ? '#6f3ff5' : '#ffe256'} />)}</Bar></BarChart></ResponsiveContainer></div><div className="segment-card"><strong>{analytics.pipelineValue}</strong><span>Pipeline value</span></div></article>
     </section>
   );
 }

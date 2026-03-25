@@ -1,14 +1,20 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { User } from '@prisma/client';
+import { AccessScopeService } from '../common/access-scope.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateNegotiationDto } from './dto/create-negotiation.dto';
 import { UpdateNegotiationDto } from './dto/update-negotiation.dto';
 
 @Injectable()
 export class NegotiationsService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly accessScopeService: AccessScopeService,
+  ) {}
 
-  findAll() {
+  findAll(user: User) {
     return this.prismaService.negotiation.findMany({
+      where: this.accessScopeService.negotiationWhere(user),
       include: {
         lead: {
           include: {
