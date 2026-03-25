@@ -113,10 +113,10 @@ const dealRows = [
 ];
 
 const loginCards: LoginCard[] = [
-  { id: 'care', title: 'Total care.\nTotal different.', accent: 'violet' },
-  { id: 'trust', title: 'Building trust\nin blockchain\ntechnology', accent: 'yellow', symbol: '+' },
+  { id: 'care', title: '', accent: 'violet' },
+  { id: 'trust', title: '', accent: 'yellow', symbol: '+' },
   { id: 'logo', title: '', accent: 'logo' },
-  { id: 'power', title: 'Own\nyour power', accent: 'yellow', symbol: '+' },
+  { id: 'power', title: '', accent: 'yellow', symbol: '+' },
 ];
 
 const loginSequences = [
