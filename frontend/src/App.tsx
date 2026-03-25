@@ -31,6 +31,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import ApiClient from './services/api';
 
 type LoginCard = {
   id: string;
@@ -149,19 +150,18 @@ const menuSecondary = [
   { label: 'Chat', icon: MessageCircle, to: '/dashboard' },
 ];
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000/api';
-const authStorageKey = 'crm-auth-token';
+const api = ApiClient.getInstance();
 
 function getAuthToken() {
-  return window.localStorage.getItem(authStorageKey);
+  return api.getToken();
 }
 
 function setAuthToken(token: string) {
-  window.localStorage.setItem(authStorageKey, token);
+  api.setToken(token);
 }
 
 function clearAuthToken() {
-  window.localStorage.removeItem(authStorageKey);
+  api.setToken(null);
 }
 
 type StoreRecord = {
@@ -208,21 +208,7 @@ type NegotiationRecord = {
 };
 
 async function apiRequest<T>(path: string, init?: RequestInit) {
-  const token = getAuthToken();
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-
-  return (await response.json()) as T;
+  return api.request<T>(path, init);
 }
 
 function useApiResource<T>(path: string, fallback: T) {
@@ -326,22 +312,11 @@ function LoginPage() {
                   setError('');
 
                   try {
-                    const response = await fetch(`${apiBaseUrl}/auth/login`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        email,
-                        password,
-                      }),
+                    const payload = await api.post<{ accessToken: string }>('/auth/login', {
+                      email,
+                      password,
                     });
 
-                    if (!response.ok) {
-                      throw new Error('Unable to sign in');
-                    }
-
-                    const payload = (await response.json()) as { accessToken: string };
                     setAuthToken(payload.accessToken);
                     navigate('/dashboard');
                   } catch {
